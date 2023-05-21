@@ -301,3 +301,269 @@ public class AppConfig {
 AppConfig가 의존관계를 `FixDiscount` -> `RateDiscountPolicy` 로 변경해서 클라이언트 코드에 주입하므로, 클라이언트 코드는 변경하지 않아도 됨
 
 소프트웨어 요소를 새롭게 확장해도 사용 영역의 변경은 닫혀 있다
+
+### IoC, DI, 그리고 컨테이너
+
+1. `IoC` : 제어의 역전
+    - 기존 객체는 클라이언트 구현 객체가 ㅅ스로 서버 구현 객체를 생성하고 연결하고 실행했다. 한마디로, `구현 객체가` 프로그램의 제어 흐름을 스스로 조종했다.
+        
+        → 개발자 입장에서는 자유로움
+        
+    - 반면에, AppConfig가 등장한 이후에 `구현 객체`는 자신의 로직을 실행하는 역할만 담당한다
+    - 프로그램에 제어 흐름에 대한 권한은 모두 `AppConfig`가 가지고 있다. AppConfig는 OrderServiceImple 이 아닌 OrderService 인터페이스의 구현 객체를 생성하고 실행할 수도 있다. 그 사실을 모른 채 `구현 객체` 는 묵묵히 자신의 로직을 실행한다
+    
+    프레임워크 vs 라이브러리
+    
+    - 프레임워크가 내가 작성한 코드를 제어하고, 대신 실행하면 그것은 프레임워크다.
+    - 반면에, 내가 작성한 코드가 직접 제어 흐름을 담당한다면 그것은 프레임워크가 아니라 라이브러리다.
+    
+    1. `DI` : 의존관계 주입
+        - `OrderServiceImpl`은 실제로 어떤 구현 객체가 사용될지 알지 못한다.
+        
+        **“정적인 클래스 의존관계”**
+        
+        - 클래스가 사용하는 import 코드만 보고 의존관계를 쉽게 판단할 수 있다. 정적인 의존관계는 어플리케이션을 실행하지 않아도 분석할 수 있다는 것이다.
+            
+            <img src='assets/Untitled 9.png' alt="" />
+        
+        **“동적인 객체 인스턴스 의존 관계”**
+        
+        - 애플리케이션 실행 시점에 실제 생성된 객체 인스턴스의 참조가 연결된 의존 관계
+            
+            <img src='assets/Untitled 8.png' alt="" />
+            
+        - 런타임에 외부에서 실제 구현 객체를 생성하고 클라이언트에 전달해서 클라이언트와 서버의 실제 의존관계가 연결되는 것을 `의존관계 주입` 이라 한다.
+        - 객체 인스턴스를 생성하고, 그 참조값을 전달해서 연결된다
+        - 의존관계 주입을 사용하면 클라이언트 코드를 변경하지 않고, 클라이언트가 호출하는 대상의 타입 인스턴스를 변경할 수 있다.
+        - **의존관계 주입을 사용하면, 정적인 클래스 의존관계를 변경하지 않고 동적인 객체 인스턴스 의존관계를 쉽게 변경할 수 있다.**
+        
+        ### IoC 컨테이너, DI컨테이너
+        
+        - AppConfig 처럼 객체를 생성하고 관리하면서 의존관계를 연결해 주는 것을 `IoC 컨테이너`, 또는 `DI 컨테이너` 라고 한다.
+        - 의존관계 주입에 초점을 맞추어 최근에는 주로 **DI컨테이너**라고 한다.
+        - 또는 어셈블러, 오브젝트 팩토리 등으로 불리기도 한다
+        
+        ### Spring 으로 전환하기
+        
+        ```java
+        package hello.core;
+        
+        import hello.core.discount.DiscountPolicy;
+        import hello.core.discount.FixDiscountPolicy;
+        import hello.core.member.MeMoryMemberRepository;
+        import hello.core.member.MemberRepository;
+        import hello.core.member.MemberService;
+        import hello.core.member.MemberServiceImpl;
+        import hello.core.order.OrderService;
+        import hello.core.order.OrderServiceImpl;
+        
+        public class AppConfig {
+        
+            public MemberService memberService(){
+                return new MemberServiceImpl(memberRepository());
+            }
+        
+            public static MemberRepository memberRepository() {
+                return new MeMoryMemberRepository();
+            }
+        
+            public OrderService orderService(){
+                return new OrderServiceImpl(memberRepository(), discountPolicy());
+            }
+        
+            public DiscountPolicy discountPolicy(){
+                return new FixDiscountPolicy();
+            }
+        }
+        ```
+        
+        →
+        
+        ```java
+        package hello.core;
+        
+        import hello.core.discount.DiscountPolicy;
+        import hello.core.discount.FixDiscountPolicy;
+        import hello.core.member.MeMoryMemberRepository;
+        import hello.core.member.MemberRepository;
+        import hello.core.member.MemberService;
+        import hello.core.member.MemberServiceImpl;
+        import hello.core.order.OrderService;
+        import hello.core.order.OrderServiceImpl;
+        import org.springframework.context.annotation.Bean;
+        import org.springframework.context.annotation.Configuration;
+        
+        @Configuration // 설정 정보
+        public class AppConfig {
+        
+            @Bean // 스프링 컨테이너에 등록됨
+            public MemberService memberService(){
+                return new MemberServiceImpl(memberRepository());
+            }
+        
+            @Bean
+            public static MemberRepository memberRepository() {
+                return new MeMoryMemberRepository();
+            }
+        
+            @Bean
+            public OrderService orderService(){
+                return new OrderServiceImpl(memberRepository(), discountPolicy());
+            }
+        
+            @Bean
+            public DiscountPolicy discountPolicy(){
+                return new FixDiscountPolicy();
+            }
+        }
+        ```
+        
+        ---
+        
+        ```java
+        package hello.core;
+        
+        import hello.core.member.Grade;
+        import hello.core.member.Member;
+        import hello.core.member.MemberService;
+        import hello.core.member.MemberServiceImpl;
+        
+        public class MemberApp {
+        
+            public static void main(String[] args) {
+                AppConfig appConfig = new AppConfig();
+                MemberService memberService = appConfig.memberService();
+                Member member = new Member(1L, "memberA", Grade.VIP);
+                memberService.join(member);
+        
+                Member findMember = memberService.findMember(1L);
+                System.out.println("new member = " + member.getName());
+                System.out.println("find member = " + findMember.getName());
+            }
+        }
+        ```
+        
+        →
+        
+        ```java
+        package hello.core;
+        
+        import hello.core.member.Grade;
+        import hello.core.member.Member;
+        import hello.core.member.MemberService;
+        import hello.core.member.MemberServiceImpl;
+        import org.springframework.context.ApplicationContext;
+        import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+        
+        public class MemberApp {
+        
+            public static void main(String[] args) {
+        //        AppConfig appConfig = new AppConfig();
+        //        MemberService memberService = appConfig.memberService();
+        
+                //스프링 컨테이너가 관리하도록 설정
+                ApplicationContext applicationContext = new AnnotationConfigApplicationContext(AppConfig.class);
+                //스프링 컨테이너를 통해서 가져오도록
+                MemberService memberService = applicationContext.getBean("memberService", MemberService.class);
+                Member member = new Member(1L, "memberA", Grade.VIP);
+                memberService.join(member);
+        
+                Member findMember = memberService.findMember(1L);
+                System.out.println("new member = " + member.getName());
+                System.out.println("find member = " + findMember.getName());
+            }
+        }
+        ```
+        
+        ```java
+        1:22:19.556 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'appConfig'
+        21:22:19.561 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'memberService'
+        21:22:19.576 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'memberRepository'
+        21:22:19.576 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'orderService'
+        21:22:19.578 [main] DEBUG org.springframework.beans.factory.support.DefaultListableBeanFactory - Creating shared instance of singleton bean 'discountPolicy'
+        ```
+        
+        이런 것들이 스프링 컨테이너 내에서 관리되는 것
+        
+        ---
+        
+        ```java
+        package hello.core;
+        
+        import hello.core.member.Grade;
+        import hello.core.member.Member;
+        import hello.core.member.MemberService;
+        import hello.core.member.MemberServiceImpl;
+        import hello.core.order.Order;
+        import hello.core.order.OrderService;
+        import hello.core.order.OrderServiceImpl;
+        
+        public class OrderApp {
+        
+            public static void main(String[] args) {
+                AppConfig appConfig = new AppConfig();
+                MemberService memberService = appConfig.memberService();
+                OrderService orderService = appConfig.orderService();
+        
+                
+                Long memberId = 1L;
+                Member member = new Member(memberId, "memberA", Grade.VIP);
+                memberService.join(member);
+        
+                Order order = orderService.createOrder(memberId,"itemA", 10000);
+        
+                System.out.println("order = " + order);
+            }
+        }
+        ```
+        
+        →
+        
+        ```java
+        package hello.core;
+        
+        import hello.core.member.Grade;
+        import hello.core.member.Member;
+        import hello.core.member.MemberService;
+        import hello.core.member.MemberServiceImpl;
+        import hello.core.order.Order;
+        import hello.core.order.OrderService;
+        import hello.core.order.OrderServiceImpl;
+        import org.springframework.context.ApplicationContext;
+        import org.springframework.context.annotation.AnnotationConfigApplicationContext;
+        
+        public class OrderApp {
+        
+            public static void main(String[] args) {
+        //        AppConfig appConfig = new AppConfig();
+        //        MemberService memberService = appConfig.memberService();
+        //        OrderService orderService = appConfig.orderService();
+        
+                ApplicationContext applicationContext = new AnnotationConfigApplicationContext(AppConfig.class);
+        
+                MemberService memberService = applicationContext.getBean("memberService", MemberService.class);
+                OrderService orderService  = applicationContext.getBean("orderService",OrderService.class);
+        
+                Long memberId = 1L;
+                Member member = new Member(memberId, "memberA", Grade.VIP);
+                memberService.join(member);
+        
+                Order order = orderService.createOrder(memberId,"itemA", 10000);
+        
+                System.out.println("order = " + order);
+            }
+        
+        }
+        ```
+        
+        ### 스프링 컨테이너
+        
+        - ApplicationContext를 `스프링 컨테이너`라 한다.
+        - 기존에는 개발자가 AppConfig 를 사용해서 직접 객체를 생성하고 DI를 했지만, 이제부터는 스프링 컨테이너를 통해서 사용한다.
+        - 스프링 컨테이너는 @Configuration이 붙은 `appConfig`를 설정정보를 사용한다. 이때 @Bean이라 적힌 메서드를 모두 호출해서 반환된 객체를 스프링 컨테이너에 등록한다. 이렇게 스프링 컨테이너에 등록된 객체를 스프링 빈이라 한다.
+        - 스프링 빈(@Bean)이 붙은 메서드의 이름을 스프링 빈의 이름으로 사용한다. 물론 @Bean(”새이름”) 처럼 바꿀 수 있다.
+        - 이전에는 개발자가 필요한 객체를 AppConfig 를 사용해서 직접 조회했지만, 스프링 컨테이너를 통해서 필요한 스프링 빈을 찾을 수 있음(ApplicationContext.getBean())
+        
+        **근데, 코드가 오히려 더 복잡한 것 같은데 스프링 컨테이너를 사용하는 이점이 뭘까????**
+        
+        → 차차 알아보자. 엄~청 많다!😲
